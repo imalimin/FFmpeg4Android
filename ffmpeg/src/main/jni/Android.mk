@@ -44,10 +44,10 @@ include $(PREBUILT_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_LDLIBS    := -lm -llog
 LOCAL_CFLAGS += -std=c99
+LOCAL_MODULE := ffmpeg
+LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c
+
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 LOCAL_LDLIBS := -llog -lz
 LOCAL_SHARED_LIBRARIES := avcodec avdevice avfilter avformat avutil swresample swscale
-
-LOCAL_MODULE := ffmpeg
-LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c
 include $(BUILD_SHARED_LIBRARY)
