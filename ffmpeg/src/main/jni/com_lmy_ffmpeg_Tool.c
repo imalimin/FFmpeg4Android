@@ -3,6 +3,7 @@
 //
 #include <com_lmy_ffmpeg_Tool.h>
 #include <string.h>
+#include "libavcodec/avcodec.h"
 /* Header for class com_lmy_ffmpeg_Tool */
 
 /*
@@ -11,6 +12,8 @@
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_lmy_ffmpeg_Tool_version
-  (JNIEnv *env, jobject obj){
-    return NULL;
+  (JNIEnv *env, jobject thiz){
+    char info[10000] = { 0 };
+    sprintf(info, "%s\n", avcodec_configuration());
+    return (*env)->NewStringUTF(env, info);
   }
