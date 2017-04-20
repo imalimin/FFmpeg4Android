@@ -194,3 +194,27 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_player_Player_decode
     avcodec_close(pCodecCtx);
     avformat_close_input(&pFormatCtx);
   }
+
+/*命令行转码
+ * Class:     com_lmy_ffmpeg_player_Player
+ * Method:    codec
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)V
+ */
+/*JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_player_Player_codec
+  (JNIEnv *env, jobject thiz, jint num, jobjectArray cmds){
+    av_log_set_callback(custom_log);
+    int argc = num;
+    char** argv = (char**)malloc(sizeof(char*) * argc);
+    int i = 0;
+    for(i = 0; i < argc; i++){
+        jstring str = (*env) -> GetObjectArrayElement(env, cmds, i);
+        const char* tmp = (*env) -> GetStringUTFChars(env, str, NULL);
+        argv[i] = (char*)malloc(sizeof(char*) * 1024);
+        strcpy(argv[i], tmp);
+    }
+    ffmpegmain(argc, argv);
+    for(i = 0; i < argc; i++){
+        free(argv[i]);
+    }
+    free(argv);
+  }*/

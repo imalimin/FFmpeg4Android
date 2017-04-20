@@ -41,6 +41,8 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                         Log.v(TAG, "start");
                         Player player = new Player();
                         player.decode("/storage/emulated/0/test.mp4", "/storage/emulated/0/test.yuv");
+//                        String cmd = "ffmpeg -i /storage/emulated/0/test.mp4 /storage/emulated/0/test.mkv";
+//                        player.codec(cmd.split(" ").length, cmd.split(" "));
                         Log.v(TAG, "end");
                         return null;
                     }

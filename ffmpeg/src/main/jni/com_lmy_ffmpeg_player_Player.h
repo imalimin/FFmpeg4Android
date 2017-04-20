@@ -15,6 +15,14 @@ extern "C" {
 JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_player_Player_decode
   (JNIEnv *, jobject, jstring, jstring);
 
+/*
+ * Class:     com_lmy_ffmpeg_player_Player
+ * Method:    codec
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_player_Player_codec
+  (JNIEnv *, jobject, jint, jobjectArray);
+
 #ifdef __cplusplus
 }
 #endif

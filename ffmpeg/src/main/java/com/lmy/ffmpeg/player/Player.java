@@ -15,5 +15,14 @@ public class Player {
         System.loadLibrary("swscale-4");
         System.loadLibrary("ffmpeg");
     }
+
     public native void decode(String in, String out);
+
+    /**
+     * 命令行转码
+     *
+     * @param num
+     * @param cmds
+     */
+    public native void codec(int num, String[] cmds);
 }
