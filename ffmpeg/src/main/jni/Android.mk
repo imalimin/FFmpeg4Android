@@ -49,5 +49,5 @@ LOCAL_LDLIBS := -llog -lz
 LOCAL_SHARED_LIBRARIES := avcodec avdevice avfilter avformat avutil swresample swscale
 
 LOCAL_MODULE := ffmpeg
-LOCAL_SRC_FILES =: com_lmy_ffmpeg_Tool.c
+LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c
 include $(BUILD_SHARED_LIBRARY)
