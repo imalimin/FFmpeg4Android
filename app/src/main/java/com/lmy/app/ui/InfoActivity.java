@@ -14,6 +14,7 @@ import butterknife.BindView;
 public class InfoActivity extends BaseActivity {
     @BindView(R.id.info)
     TextView mInfoView;
+
     @Override
     protected int getLayoutView() {
         return R.layout.activity_info;
@@ -23,12 +24,12 @@ public class InfoActivity extends BaseActivity {
     protected void initView() {
         Version version = new Version();
         String str = "";
-//        str = String.format("Version: %s\n", version.version());
-        str += String.format("Protocol: %s\n", version.protocol());
-//        str += String.format("Format: %s\n", version.format());
-//        str += String.format("Codec: %s\n", version.codec());
-//        str += String.format("Filter: %s\n", version.filter());
-        str += String.format("Configure: %s\n", version.configure());
+//        str = String.format("Version:\n%s\n", version.version());
+        str += String.format("Protocol:\n%s\n", version.protocol());
+        str += String.format("Format:\n%s\n", version.format());
+        str += String.format("Codec:\n%s\n", version.codec());
+//        str += String.format("Filter:\n%s\n", version.filter());
+        str += String.format("Configure:\n%s\n", version.configure());
         mInfoView.setText(str);
     }
 }
