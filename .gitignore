@@ -1,20 +1,35 @@
+/local.properties
+/.idea
+.DS_Store
+*.iml
+
 # Built application files
 *.apk
 *.ap_
 
-# Files for the ART/Dalvik VM
+# Files for the Dalvik VM
 *.dex
 
 # Java class files
 *.class
 
+# Java lib files
+libs/
+
+# Android lib files
+aars/
+
+# Jni lib files
+jniLibs/
+.externalNativeBuild/
+
 # Generated files
 bin/
 gen/
-out/
 
 # Gradle files
 .gradle/
+gradle/
 build/
 
 # Local configuration file (sdk path, etc)
@@ -31,10 +46,3 @@ proguard/
 
 # Android Studio captures folder
 captures/
-
-# Intellij
-*.iml
-.idea/workspace.xml
-
-# Keystore files
-*.jks
