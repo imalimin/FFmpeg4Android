@@ -12,11 +12,25 @@ android {
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
+        ndk {
+            moduleName "ffmpeg"
+            abiFilters "armeabi", "armeabi-v7a"  //输出指定abi体系结构下的so库
+        }
+        sourceSets.main {
+            jni.srcDirs = []
+            jniLibs.srcDir "src/main/jniLibs"
+        }
+
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    externalNativeBuild {
+        ndkBuild {
+            path "src/main/jni/Android.mk"
         }
     }
 }
@@ -27,5 +41,4 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     compile 'com.android.support:appcompat-v7:25.0.0'
-    testCompile 'junit:junit:4.12'
 }
