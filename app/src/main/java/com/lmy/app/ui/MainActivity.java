@@ -1,15 +1,15 @@
 package com.lmy.app.ui;
 
-import android.widget.TextView;
+import android.content.Intent;
+import android.view.View;
 
 import com.lmy.app.R;
-import com.lmy.ffmpeg.Tool;
 
 import butterknife.BindView;
 
-public class MainActivity extends BaseActivity {
-    @BindView(R.id.ver)
-    TextView mVerView;
+public class MainActivity extends BaseActivity implements View.OnClickListener {
+    @BindView(R.id.info)
+    View mInfoBtn;
 
     @Override
     protected int getLayoutView() {
@@ -18,6 +18,15 @@ public class MainActivity extends BaseActivity {
 
     @Override
     protected void initView() {
-        mVerView.setText(new Tool().version());
+        mInfoBtn.setOnClickListener(this);
+    }
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.info:
+                startActivity(new Intent(this, InfoActivity.class));
+                break;
+        }
     }
 }

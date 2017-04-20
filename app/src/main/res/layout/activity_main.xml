@@ -10,8 +10,9 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="com.lmy.app.ui.MainActivity">
 
-    <TextView
-        android:id="@+id/ver"
+    <Button
+        android:id="@+id/info"
+        android:text="信息"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 </RelativeLayout>
