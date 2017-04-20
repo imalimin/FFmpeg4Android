@@ -45,7 +45,7 @@ include $(CLEAR_VARS)
 LOCAL_LDLIBS    := -lm -llog
 LOCAL_CFLAGS += -std=c99
 LOCAL_MODULE := ffmpeg
-LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c
+LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c com_lmy_ffmpeg_player_Player.c
 
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 LOCAL_LDLIBS := -llog -lz
