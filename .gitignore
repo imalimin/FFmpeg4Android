@@ -20,8 +20,10 @@ libs/
 aars/
 
 # Jni lib files
-jniLibs/
 .externalNativeBuild/
+jniLibs/
+include/
+*.so
 
 # Generated files
 bin/
