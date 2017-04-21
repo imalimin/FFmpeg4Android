@@ -1,12 +1,19 @@
 package com.lmy.app.ui;
 
 import android.content.Intent;
+import android.graphics.ImageFormat;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
 
 import com.lmy.app.R;
-import com.lmy.ffmpeg.player.Player;
+import com.lmy.ffmpeg.widget.VideoView;
+
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 
 import butterknife.BindView;
 
@@ -16,6 +23,10 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     View mInfoBtn;
     @BindView(R.id.enter)
     View mEnterBtn;
+    @BindView(R.id.image)
+    ImageView mImageView;
+    @BindView(R.id.video)
+    VideoView mVideoView;
 
     @Override
     protected int getLayoutView() {
@@ -26,6 +37,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     protected void initView() {
         mInfoBtn.setOnClickListener(this);
         mEnterBtn.setOnClickListener(this);
+        mVideoView.setDataSource("/storage/emulated/0/test.mp4");
     }
 
     @Override
@@ -35,19 +47,41 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                 startActivity(new Intent(this, InfoActivity.class));
                 break;
             case R.id.enter:
-                new AsyncTask<Void, Void, Void>() {
-                    @Override
-                    protected Void doInBackground(Void... voids) {
-                        Log.v(TAG, "start");
-                        Player player = new Player();
-                        player.decode("/storage/emulated/0/test.mp4", "/storage/emulated/0/test.yuv");
-//                        String cmd = "ffmpeg -i /storage/emulated/0/test.mp4 /storage/emulated/0/test.mkv";
-//                        player.codec(cmd.split(" ").length, cmd.split(" "));
-                        Log.v(TAG, "end");
-                        return null;
-                    }
-                }.execute();
+                mVideoView.start();
+//                new AsyncTask<Void, Void, YuvImage>() {
+//                    @Override
+//                    protected YuvImage doInBackground(Void... voids) {
+//                        long time = System.currentTimeMillis();
+//                        mDecoder.nextFrame();
+//                        Log.v(TAG, String.format("decode: %d", System.currentTimeMillis() - time));
+//                        if (mDecoder.getFrame().getData() == null || mDecoder.getFrame().getData().length == 0)
+//                            return null;
+//                        YuvImage image = new YuvImage(mDecoder.getFrame().getData(), ImageFormat.NV21,
+//                                mDecoder.getFrame().getWidth(), mDecoder.getFrame().getHeight(), null);
+//                        Log.v(TAG, String.format("to YuvImage: %d", System.currentTimeMillis() - time));
+////                        MediaPlayer mediaPlayer;
+////                        mediaPlayer.setDataSource();
+//                        try {
+//                            image.compressToJpeg(new Rect(0, 0, mDecoder.getFrame().getWidth(), mDecoder.getFrame().getHeight()),
+//                                    80, new FileOutputStream("/storage/emulated/0/aaaaaaaa.jpg"));
+//                        } catch (FileNotFoundException e) {
+//                            e.printStackTrace();
+//                        }
+//                        return image;
+//                    }
+//
+//                    @Override
+//                    protected void onPostExecute(YuvImage yuvImage) {
+//                        super.onPostExecute(yuvImage);
+//                    }
+//                }.execute();
                 break;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+//        mDecoder.release();
     }
 }
