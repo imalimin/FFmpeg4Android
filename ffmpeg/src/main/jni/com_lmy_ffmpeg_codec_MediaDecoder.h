@@ -9,11 +9,35 @@ extern "C" {
 #endif
 /*
  * Class:     com_lmy_ffmpeg_codec_MediaDecoder
+ * Method:    setDataSource
+ * Signature: (Ljava/lang/String;Lcom/lmy/ffmpeg/codec/AVFrame;)V
+ */
+JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
+  (JNIEnv *, jobject, jstring, jobject);
+
+/*
+ * Class:     com_lmy_ffmpeg_codec_MediaDecoder
+ * Method:    nextFrame
+ * Signature: ()Z
+ */
+JNIEXPORT jint JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_nextFrame
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lmy_ffmpeg_codec_MediaDecoder
  * Method:    decode
  * Signature: (Ljava/lang/String;Lcom/lmy/ffmpeg/codec/AVFrame;)V
  */
 JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_decode
   (JNIEnv *, jobject, jstring, jobject);
+
+/*
+ * Class:     com_lmy_ffmpeg_codec_MediaDecoder
+ * Method:    release
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_release
+  (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }
