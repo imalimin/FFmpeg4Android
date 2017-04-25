@@ -1,19 +1,12 @@
 package com.lmy.app.ui;
 
 import android.content.Intent;
-import android.graphics.ImageFormat;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
-import android.os.AsyncTask;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 
 import com.lmy.app.R;
+import com.lmy.ffmpeg.codec.MediaDecoder;
 import com.lmy.ffmpeg.widget.VideoView;
-
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 
 import butterknife.BindView;
 
@@ -27,6 +20,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     ImageView mImageView;
     @BindView(R.id.video)
     VideoView mVideoView;
+    private MediaDecoder mDecoder;
 
     @Override
     protected int getLayoutView() {
@@ -37,7 +31,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     protected void initView() {
         mInfoBtn.setOnClickListener(this);
         mEnterBtn.setOnClickListener(this);
-        mVideoView.setDataSource("/storage/emulated/0/test.mp4");
+        mVideoView.setDataSource("/storage/emulated/0/邓紫棋 喜欢你.mp4");
     }
 
     @Override
@@ -52,6 +46,10 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
 //                    @Override
 //                    protected YuvImage doInBackground(Void... voids) {
 //                        long time = System.currentTimeMillis();
+//                        if (mDecoder == null) {
+//                            mDecoder = new MediaDecoder();
+//                            mDecoder.setDataSource("/storage/emulated/0/test.mp4");
+//                        }
 //                        mDecoder.nextFrame();
 //                        Log.v(TAG, String.format("decode: %d", System.currentTimeMillis() - time));
 //                        if (mDecoder.getFrame().getData() == null || mDecoder.getFrame().getData().length == 0)
@@ -82,6 +80,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        mVideoView.release();
 //        mDecoder.release();
     }
 }
