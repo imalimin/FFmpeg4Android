@@ -10,7 +10,7 @@ import android.view.TextureView;
 /**
  * This extension of {@link TextureView} is created to isolate scaling of this view.
  */
-public abstract class ScalableTextureView extends TextureView{
+public abstract class ScalableTextureView extends TextureView {
 
     private Integer mContentWidth;
     private Integer mContentHeight;
@@ -33,7 +33,7 @@ public abstract class ScalableTextureView extends TextureView{
     private ScaleType mScaleType;
 
     public enum ScaleType {
-        CENTER_CROP, TOP, BOTTOM, FILL
+        CENTER_CROP, CENTER_INSIDE, TOP, BOTTOM, FILL
     }
 
     public ScalableTextureView(Context context) {
@@ -82,6 +82,10 @@ public abstract class ScalableTextureView extends TextureView{
         float scaleY = 1.0f;
 
         switch (mScaleType) {
+            case CENTER_INSIDE:
+                scaleX = Math.max(viewWidth / contentWidth, viewHeight / contentHeight);
+                scaleY = scaleX;
+                break;
             case FILL:
                 if (viewWidth > viewHeight) {   // device in landscape
                     scaleX = (viewHeight * contentWidth) / (viewWidth * contentHeight);
@@ -91,6 +95,9 @@ public abstract class ScalableTextureView extends TextureView{
                 break;
             case BOTTOM:
             case CENTER_CROP:
+                scaleX = Math.min(viewWidth / contentWidth, viewHeight / contentHeight);
+                scaleY = scaleX;
+                break;
             case TOP:
                 if (contentWidth > viewWidth && contentHeight > viewHeight) {
                     scaleX = contentWidth / viewWidth;
@@ -119,6 +126,7 @@ public abstract class ScalableTextureView extends TextureView{
                 pivotPointX = viewWidth;
                 pivotPointY = viewHeight;
                 break;
+            case CENTER_INSIDE:
             case CENTER_CROP:
                 pivotPointX = viewWidth / 2;
                 pivotPointY = viewHeight / 2;
@@ -213,6 +221,7 @@ public abstract class ScalableTextureView extends TextureView{
 
     /**
      * Use it to animate TextureView content x position
+     *
      * @param x
      */
     public final void setContentX(float x) {
@@ -222,6 +231,7 @@ public abstract class ScalableTextureView extends TextureView{
 
     /**
      * Use it to animate TextureView content x position
+     *
      * @param y
      */
     public final void setContentY(float y) {
