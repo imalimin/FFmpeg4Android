@@ -6,8 +6,24 @@ package com.lmy.ffmpeg.codec;
 
 public class AVFrame {
     private final static int AV_NUM_DATA_POINTERS = 8;
-
+    /**
+     * 图像数据
+     * pointer to the picture/channel planes.
+     * This might be different from the first allocated byte
+     * - encoding: Set by user
+     * - decoding: set by AVCodecContext.get_buffer()
+     */
     private byte[] data;
+    /**
+     * Size, in bytes, of the data for each picture/channel plane.
+     * <p>
+     * For audio, only linesize[0] may be set. For planar audio, each channel
+     * plane must be the same size.
+     * <p>
+     * - encoding: Set by user
+     * - decoding: set by AVCodecContext.get_buffer()
+     */
+    private int linesize[];
     private int width, height;
     /**
      * 音频的一个AVFrame中可能包含多个音频帧，在此标记包含了几个
@@ -32,6 +48,10 @@ public class AVFrame {
     private AVRational sample_aspect_ratio;
     /**
      * 显示时间戳
+     * presentation timestamp in time_base units (time when frame should be shown to user)
+     * If AV_NOPTS_VALUE then frame_rate = 1/time_base will be assumed.
+     * - encoding: MUST be set by user.
+     * - decoding: Set by libavcodec.
      */
     private long pts;
     /**
@@ -40,6 +60,9 @@ public class AVFrame {
     private int coded_picture_number;
     /**
      * 显示帧序号
+     * picture number in bitstream order
+     * - encoding: set by
+     * - decoding: Set by libavcodec.
      */
     private int display_picture_number;
 //    int8_t *qscale_table：QP表
@@ -48,11 +71,47 @@ public class AVFrame {
 //    uint32_t *mb_type：宏块类型表
 //    short *dct_coeff：DCT系数，这个没有提取过
 //    int8_t *ref_index[2]：运动估计参考帧列表（貌似H.264这种比较新的标准才会涉及到多参考帧）
+
+    /**
+     * reordered pts from the last AVPacket that has been input into the decoder
+     * - encoding: unused
+     * - decoding: Read by user.
+     */
+    private int pkt_pts;
+
+    /**
+     * dts from the last AVPacket that has been input into the decoder
+     * - encoding: unused
+     * - decoding: Read by user.
+     */
+    private int pkt_dts;
+    /**
+     * quality (between 1 (good) and FF_LAMBDA_MAX (bad))
+     * - encoding: Set by libavcodec. for coded_picture (and set by user for input).
+     * - decoding: Set by libavcodec.
+     */
+    private int quality;
     /**
      * 是否是隔行扫描
      */
     private int interlaced_frame;
 //    uint8_t motion_subsample_log2：一个宏块中的运动矢量采样个数，取log的
+    /**
+     * （音频）采样率
+     * Sample rate of the audio data.
+     * <p>
+     * - encoding: unused
+     * - decoding: read by user
+     */
+    private int sample_rate;
+    /**
+     * number of audio channels, only used for audio.
+     * Code outside libavcodec should access this field using:
+     * av_frame_get_channels(frame)
+     * - encoding: unused
+     * - decoding: Read by user.
+     */
+    private int channels;
 
     public byte[] getData() {
         return data;
@@ -148,5 +207,29 @@ public class AVFrame {
 
     public void setInterlaced_frame(int interlaced_frame) {
         this.interlaced_frame = interlaced_frame;
+    }
+
+    public int[] getLinesize() {
+        return linesize;
+    }
+
+    public int getPkt_pts() {
+        return pkt_pts;
+    }
+
+    public int getPkt_dts() {
+        return pkt_dts;
+    }
+
+    public int getQuality() {
+        return quality;
+    }
+
+    public int getSample_rate() {
+        return sample_rate;
+    }
+
+    public int getChannels() {
+        return channels;
     }
 }
