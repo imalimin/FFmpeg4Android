@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "libyuv.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 #include "libswscale/swscale.h"
@@ -33,13 +34,14 @@
 
 char input[500] = {0};
 AVFormatContext *pFormatCtx;
-int video_index;
-AVCodecContext *pCodecCtx;
+int video_index = -1, audio_index = -1;
+AVCodecContext *pCodecCtx, *aCodecCtx;
+//音频或视频解码器指针
 AVCodec *pCodec;
 AVFrame *pFrame, *pOutFrame;
 AVPacket *packet;
 struct SwsContext *img_convert_ctx;
-int ret, got_picture;
+int ret, got_frame;
 struct SwsContext *img_convert_ctx;
 int frame_cnt;
 //缓存帧
@@ -72,6 +74,11 @@ void init_info(JNIEnv *env, jobject thiz){
     (*env)->SetIntField(env, thiz , fieldId, pCodecCtx -> width);//获得属性值
     fieldId = (*env)->GetFieldID(env, cls , "height" , "I");
     (*env)->SetIntField(env, thiz , fieldId, pCodecCtx -> height);
+    fieldId = (*env)->GetFieldID(env, cls , "sample_rate" , "I");
+    (*env)->SetIntField(env, thiz , fieldId, aCodecCtx -> sample_rate);
+    fieldId = (*env)->GetFieldID(env, cls , "channels" , "I");
+    (*env)->SetIntField(env, thiz , fieldId, aCodecCtx -> channels);
+    LOGI("init %d %d", aCodecCtx -> sample_rate, aCodecCtx -> channels);
 }
 
 void swap_frame(JNIEnv *env, AVFrame* av, jobject frame){
@@ -80,47 +87,89 @@ void swap_frame(JNIEnv *env, AVFrame* av, jobject frame){
         return;
     }
     clock_t start = clock();
+    init_frame(env ,av, frame);
     int width = av -> width;
     int height = av -> height;
 
     jfieldID  fieldId;
     jclass cls = (*env)->GetObjectClass(env, frame);//获得Java层该对象实例的类引用
-    fieldId = (*env)->GetFieldID(env, cls , "width" , "I");//获得属性句柄
-    (*env)->SetIntField(env, frame , fieldId, width);//获得属性值
-    fieldId = (*env)->GetFieldID(env, cls , "height" , "I");
-    (*env)->SetIntField(env, frame , fieldId, height);
 
     fieldId = (*env)->GetFieldID(env, cls , "data" , "[B");
 
     int len = 0;
     int size = av_image_get_buffer_size(av -> format, width, height, 1);
 
-    buffer = (*env)->NewByteArray(env, size);
-    pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
     switch(av -> format){
         case AV_PIX_FMT_YUV420P:
-            len = av -> linesize[0] * height;
-            memcpy(pBuffer, av -> data[0], len);
-            pBuffer+=len;
-            len = av -> linesize[1] * height/2;
-            memcpy(pBuffer, av -> data[1], len);
-            pBuffer+=len;
-            len = av -> linesize[2] * height/2;
-            memcpy(pBuffer, av -> data[2], len);
-            pBuffer+=len;
+            LOGI("AV_PIX_FMT_YUV420P %d, %d, %d", width, height, av -> linesize[0]);
+            /*size = width * height * 4;
+            buffer = (*env)->NewByteArray(env, size);
+            pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
+            yuv420_2_rgb8888(pBuffer, av -> data[0], av -> data[1], av -> data[2], width, height);*/
+            //cvt_i420_NV21(av -> data, pBuffer, width, height);
+            size = width * height * 4;
+            buffer = (*env)->NewByteArray(env, size);
+            pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
+            I420ToARGB(av -> data[0], av -> linesize[0],
+            av -> data[2], av -> linesize[2],
+            av -> data[1], av -> linesize[1],
+            pBuffer, width * 4, width, height);
+            /*memcpy(pBuffer, av -> data[0], av -> linesize[0] * height);
+            len = av -> linesize[1] * height / 2;
+            memcpy(pBuffer + av -> linesize[0] * height, av -> data[1], len);
+            memcpy(pBuffer + av -> linesize[0] * height + len, av -> data[2], len);*/
             break;
         default:
+            buffer = (*env)->NewByteArray(env, size);
+            pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
             len = av -> linesize[0] * height;
             memcpy(pBuffer, av -> data[0], len);
-            pBuffer+=len;
     }
 
-    pBuffer-=size;
     (*env)->SetByteArrayRegion(env, buffer, 0, size, pBuffer);
     (*env)->SetObjectField(env, frame , fieldId, buffer);
     LOGI("swap_frame time = %d", (long)((clock() - start)/1000));
 }
 
+void init_frame(JNIEnv *env, AVFrame* av, jobject frame){
+    if(frame == NULL){
+        LOGE("AVFrame is NULL!");
+        return;
+    }
+
+    jfieldID  fieldId;
+    jclass cls = (*env)->GetObjectClass(env, frame);//获得Java层该对象实例的类引用
+    fieldId = (*env)->GetFieldID(env, cls , "width" , "I");//获得属性句柄
+    (*env)->SetIntField(env, frame , fieldId, av -> width);//设置属性值
+    fieldId = (*env)->GetFieldID(env, cls , "height" , "I");
+    (*env)->SetIntField(env, frame , fieldId, av -> height);
+    fieldId = (*env)->GetFieldID(env, cls , "format" , "I");
+    (*env)->SetIntField(env, frame , fieldId, av -> format);
+    fieldId = (*env)->GetFieldID(env, cls , "sample_rate" , "I");
+    (*env)->SetIntField(env, frame , fieldId, av -> sample_rate);
+    fieldId = (*env)->GetFieldID(env, cls , "nb_samples" , "I");
+    (*env)->SetIntField(env, frame , fieldId, av -> nb_samples);
+    fieldId = (*env)->GetFieldID(env, cls , "channels" , "I");
+    (*env)->SetIntField(env, frame , fieldId, av -> channels);
+}
+
+void swap_audio_frame(JNIEnv *env, AVFrame* av, jobject frame){
+    if(frame == NULL){
+        LOGE("AVFrame is NULL!");
+        return;
+    }
+    init_frame(env ,av, frame);
+    jfieldID  fieldId;
+    jclass cls = (*env)->GetObjectClass(env, frame);//获得Java层该对象实例的类引用
+
+    fieldId = (*env)->GetFieldID(env, cls , "data" , "[B");
+    int size = av_samples_get_buffer_size(av -> linesize, aCodecCtx -> channels,av -> nb_samples,
+    aCodecCtx -> sample_fmt, 1);
+    buffer = (*env)->NewByteArray(env, size);
+    pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
+    (*env)->SetByteArrayRegion(env, buffer, 0, size, pBuffer);
+    (*env)->SetObjectField(env, frame , fieldId, buffer);
+}
 /*
  * Class:     com_lmy_ffmpeg_codec_MediaDecoder
  * Method:    setDataSource
@@ -147,25 +196,41 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
         return;
     }
     int i = 0;
-    for(i = 0; i<pFormatCtx -> nb_streams; i++){
-        if(pFormatCtx -> streams[i] -> codec -> codec_type == AVMEDIA_TYPE_VIDEO){
+    for(i = 0; i < pFormatCtx -> nb_streams; i++){
+        int type = pFormatCtx -> streams[i] -> codec -> codec_type;
+        if(type == AVMEDIA_TYPE_VIDEO){
             video_index = i;
-            break;
+        }else if(type == AVMEDIA_TYPE_AUDIO){
+            audio_index = i;
         }
+        if(video_index != -1 && audio_index != -1) break;
     }
     if(video_index == -1){
         LOGE("无法找到视频流信息\n");
         return;
     }
+    if(audio_index == -1){
+        LOGE("无法找到音频流信息\n");
+    }
 
     pCodecCtx = pFormatCtx ->streams[video_index] -> codec;
     pCodec = avcodec_find_decoder(pCodecCtx -> codec_id);
     if(pCodec == NULL){
-        LOGE("没有合适的解码器\n");
+        LOGE("没有合适的视频解码器\n");
         return;
     }
     if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0){
-        LOGE("无法打开解码器\n");
+        LOGE("无法打开视频解码器\n");
+        return;
+    }
+    aCodecCtx = pFormatCtx ->streams[audio_index] -> codec;
+    pCodec = avcodec_find_decoder(aCodecCtx -> codec_id);
+    if(pCodec == NULL){
+        LOGE("没有合适的音频解码器\n");
+        return;
+    }
+    if(avcodec_open2(aCodecCtx, pCodec, NULL) < 0){
+        LOGE("无法打开音频解码器\n");
         return;
     }
 
@@ -180,7 +245,20 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
 
     //av_init_packet(&packet);
     packet = (AVPacket *)av_malloc(sizeof(AVPacket));
-
+    /**
+    * 图像拉伸
+    * #define SWS_FAST_BILINEAR     1
+    * #define SWS_BILINEAR          2
+    * #define SWS_BICUBIC           4
+    * #define SWS_X                 8
+    * #define SWS_POINT          0x10
+    * #define SWS_AREA           0x20
+    * #define SWS_BICUBLIN       0x40
+    * #define SWS_GAUSS          0x80
+    * #define SWS_SINC          0x100
+    * #define SWS_LANCZOS       0x200
+    * #define SWS_SPLINE        0x400
+    **/
     img_convert_ctx = sws_getContext(pCodecCtx -> width, pCodecCtx -> height, pCodecCtx -> pix_fmt,
     pCodecCtx -> width, pCodecCtx -> height, pOutFrame -> format, SWS_BICUBIC, NULL, NULL, NULL);
 
@@ -197,38 +275,48 @@ JNIEXPORT jint JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_nextFrame
     clock_t start = clock();
     while(av_read_frame(pFormatCtx, packet) >= 0){
         if(packet -> stream_index == video_index){
-            ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
+            ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_frame, packet);
             if(ret < 0){
                 LOGE("帧解码失败\n");
                 return (jint)-1;
             }
-            if(!got_picture)
+            if(!got_frame)
                 continue;
-            sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame -> data, pFrame -> linesize,
-            0, pCodecCtx -> height, pOutFrame -> data, pOutFrame -> linesize);
+            LOGI("decode time = %d", (long)((clock() - start)/1000));
+            //sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame -> data, pFrame -> linesize,
+            //0, pCodecCtx -> height, pOutFrame -> data, pOutFrame -> linesize);
+            LOGI("sws_scale time = %d", (long)((clock() - start)/1000));
             print_type(frame_cnt, pFrame -> pict_type);
-            swap_frame(env, pOutFrame, avframe);
+            swap_frame(env, pFrame, avframe);
             frame_cnt++;
             av_free_packet(packet);
-            LOGI("decode time = %d", (long)((clock() - start)/1000));
+            return (jint)0;
+        }else if(packet -> stream_index == audio_index && aCodecCtx != NULL){
+            ret = avcodec_decode_audio4(aCodecCtx, pFrame, &got_frame, packet);
+            if(ret < 0){
+                LOGE("音频解码失败\n");
+                return (jint)-1;
+            }
+            if(!got_frame)
+                continue;
+            LOGI("音频: %d %d %d", pFrame -> sample_rate, pFrame -> nb_samples, pFrame -> linesize[0]);
+            swap_audio_frame(env, pFrame, avframe);
             return (jint)0;
         }
         av_free_packet(packet);
      }
-     //最后一帧
     while(1){
-        ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
+        ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_frame, packet);
         if(ret < 0){
             LOGE("帧解码失败\n");
             break;
         }
-        if(!got_picture)
+        if(!got_frame)
             break;
-        sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame -> data, pFrame -> linesize,
-        0, pCodecCtx -> height, pOutFrame -> data, pOutFrame -> linesize);
+        //sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame -> data, pFrame -> linesize,
+        //0, pCodecCtx -> height, pOutFrame -> data, pOutFrame -> linesize);
         print_type(frame_cnt, pFrame -> pict_type);
-        swap_frame(env, pOutFrame, avframe);
-        LOGI("end swap_frame");
+        swap_frame(env, pFrame, avframe);
         frame_cnt++;
         return (jint)0;
     }
@@ -249,130 +337,3 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_release
     avcodec_close(pCodecCtx);
     avformat_close_input(&pFormatCtx);
   }
-
-/*
- * Class:     com_lmy_ffmpeg_codec_MediaDecoder
- * Method:    decode
- * Signature: (Ljava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_decode
-  (JNIEnv *env, jobject thiz, jstring path, jobject frame){
-    char input_str[500] = {0};
-    sprintf(input_str, "%s", (*env)->GetStringUTFChars(env, path, NULL));
-
-    AVFormatContext *pFormatCtx;
-    int i, videoindex;
-    AVCodecContext *pCodecCtx;
-    AVCodec *pCodec;
-    AVFrame *pFrame, *pFrameYUV;
-    AVPacket *packet;
-    struct SwsContext *img_convert_ctx;
-    int ret, got_picture;
-    int frame_cnt;
-
-    //av_log_set_callback(custom_log);
-
-    av_register_all();
-    avformat_network_init();
-    pFormatCtx = avformat_alloc_context();
-
-    if(avformat_open_input(&pFormatCtx, input_str, NULL, NULL) != 0){
-        LOGE("无法打开输入文件\n");
-        return;
-    }
-    if(avformat_find_stream_info(pFormatCtx, NULL) < 0){
-        LOGE("无法获取输入流信息\n");
-        return;
-    }
-    videoindex = -1;
-    for(i = 0; i<pFormatCtx -> nb_streams; i++){
-        if(pFormatCtx -> streams[i] -> codec -> codec_type == AVMEDIA_TYPE_VIDEO){
-            videoindex = i;
-            break;
-        }
-    }
-    if(videoindex == -1){
-        LOGE("无法找到视频流信息\n");
-        return;
-    }
-
-    pCodecCtx = pFormatCtx ->streams[videoindex] -> codec;
-    pCodec = avcodec_find_decoder(pCodecCtx -> codec_id);
-    if(pCodec == NULL){
-        LOGE("没有合适的解码器\n");
-        return;
-    }
-    if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0){
-        LOGE("无法打开解码器\n");
-        return;
-    }
-
-    //LOGI("格式：");
-    //LOGI(pFormatCtx -> iformat -> name);
-    //LOGI("解码器：");
-    //LOGI(pCodecCtx -> codec -> name);
-
-    pFrame = av_frame_alloc();
-    pFrameYUV = av_frame_alloc();
-    uint8_t *out_buffer = (unsigned char *)av_malloc(av_image_get_buffer_size(AV_PIX_FMT_YUV420P, pCodecCtx -> width, pCodecCtx -> height, 1));
-    av_image_fill_arrays(pFrameYUV -> data, pFrameYUV -> linesize, out_buffer, AV_PIX_FMT_YUV420P, pCodecCtx -> width,pCodecCtx -> height, 1);
-    packet = (AVPacket *)av_malloc(sizeof(AVPacket));
-
-    img_convert_ctx = sws_getContext(pCodecCtx -> width, pCodecCtx -> height, pCodecCtx -> pix_fmt,
-    pCodecCtx -> width, pCodecCtx -> height,AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
-
-    frame_cnt = 0;
-    while(av_read_frame(pFormatCtx, packet) >= 0){
-        if(packet -> stream_index == videoindex){
-            ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
-            if(ret < 0){
-                LOGE("帧解码失败\n");
-                return;
-            }
-            if(!got_picture)
-                continue;
-            sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame -> data, pFrame -> linesize,
-            0, pCodecCtx -> height, pFrameYUV -> data, pFrameYUV -> linesize);
-            int y_size = pCodecCtx ->width * pCodecCtx -> height;
-            swap_frame(env, pFrame, frame);
-
-            char pict_type[10] = {0};
-            switch(pFrame -> pict_type){
-                case AV_PICTURE_TYPE_I:
-                    sprintf(pict_type, "I: %d, %d", y_size, strlen(pFrameYUV -> data[2]));
-                    break;
-                case AV_PICTURE_TYPE_P:
-                    sprintf(pict_type, "P: %d", sizeof(pFrameYUV -> data) / sizeof(uint8_t *));
-                    break;
-                case AV_PICTURE_TYPE_B:
-                    sprintf(pict_type, "B: %d", sizeof(pFrameYUV -> data) / sizeof(uint8_t *));
-                    break;
-                default:
-                    sprintf(pict_type, "Other: %d", sizeof(pFrameYUV -> data) / sizeof(uint8_t *));
-            }
-            LOGI("第%5d帧，类型：%s",frame_cnt, pict_type);
-            frame_cnt++;
-            break;
-        }
-        av_free_packet(packet);
-    }
-    /*while(1){
-        ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
-        if(ret < 0)
-            break;
-        if(!got_picture)
-            break;
-        sws_scale(img_convert_ctx, (const uint8_t* const*) pFrame -> data, pFrame -> linesize, 0,
-        pCodecCtx -> height, pFrameYUV -> data, pFrameYUV -> linesize);
-        int y_size = pCodecCtx -> width * pCodecCtx -> height;
-        print_type(frame_cnt, pFrame -> pict_type);
-        frame_cnt++;
-    }*/
-
-    sws_freeContext(img_convert_ctx);
-    av_frame_free(&pFrame);
-    av_frame_free(&pFrameYUV);
-    avcodec_close(pCodecCtx);
-    avformat_close_input(&pFormatCtx);
-  }
-

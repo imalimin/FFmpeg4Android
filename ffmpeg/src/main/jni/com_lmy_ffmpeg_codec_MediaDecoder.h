@@ -25,14 +25,6 @@ JNIEXPORT jint JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_nextFrame
 
 /*
  * Class:     com_lmy_ffmpeg_codec_MediaDecoder
- * Method:    decode
- * Signature: (Ljava/lang/String;Lcom/lmy/ffmpeg/codec/AVFrame;)V
- */
-JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_decode
-  (JNIEnv *, jobject, jstring, jobject);
-
-/*
- * Class:     com_lmy_ffmpeg_codec_MediaDecoder
  * Method:    release
  * Signature: ()V
  */
