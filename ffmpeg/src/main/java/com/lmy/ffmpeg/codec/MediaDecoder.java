@@ -6,18 +6,33 @@ package com.lmy.ffmpeg.codec;
 
 public class MediaDecoder {
     static {
-        System.loadLibrary("avcodec-57");
-        System.loadLibrary("avdevice-57");
-        System.loadLibrary("avfilter-6");
-        System.loadLibrary("avformat-57");
-        System.loadLibrary("avutil-55");
-        System.loadLibrary("swresample-2");
-        System.loadLibrary("swscale-4");
+        System.loadLibrary("avcodec-56");
+        System.loadLibrary("avfilter-5");
+        System.loadLibrary("avformat-56");
+        System.loadLibrary("avutil-54");
+        System.loadLibrary("swresample-1");
+        System.loadLibrary("swscale-3");
         System.loadLibrary("ffmpeg");
     }
 
     private AVFrame mFrame;
     private int width, height;
+    /**
+     * （音频）采样率
+     * Sample rate of the audio data.
+     * <p>
+     * - encoding: unused
+     * - decoding: read by user
+     */
+    private int sample_rate;
+    /**
+     * number of audio channels, only used for audio.
+     * Code outside libavcodec should access this field using:
+     * av_frame_get_channels(frame)
+     * - encoding: unused
+     * - decoding: Read by user.
+     */
+    private int channels;
 
     public MediaDecoder() {
         this.mFrame = new AVFrame();
@@ -31,13 +46,7 @@ public class MediaDecoder {
 
     public native int nextFrame();
 
-    private native void decode(String path, AVFrame frame);
-
     public native void release();
-
-    public void decode(String path) {
-        decode(path, mFrame);
-    }
 
     public AVFrame getFrame() {
         return mFrame;
@@ -57,5 +66,21 @@ public class MediaDecoder {
 
     public void setHeight(int height) {
         this.height = height;
+    }
+
+    public int getSample_rate() {
+        return sample_rate;
+    }
+
+    public void setSample_rate(int sample_rate) {
+        this.sample_rate = sample_rate;
+    }
+
+    public int getChannels() {
+        return channels;
+    }
+
+    public void setChannels(int channels) {
+        this.channels = channels;
     }
 }
