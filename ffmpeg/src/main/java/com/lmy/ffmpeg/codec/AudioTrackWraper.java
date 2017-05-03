@@ -5,30 +5,30 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.util.Log;
 
-import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Created by lmy on 2017/4/25.
  */
 
-public class AudioDevice implements Runnable {
-    private final static String TAG = "AudioDevice";
+public class AudioTrackWraper implements Runnable {
+    private final static String TAG = "AudioTrackWraper";
     private AudioTrack mPlayer;
     private int sampleRateInHz = 48000;
     private int channelConfig = AudioFormat.CHANNEL_CONFIGURATION_STEREO;//双声道
     private int audioFormat;//采样格式
     private Thread mPlayThread;
-    private final Queue<byte[]> mQueue = new LinkedList<>();
+    private final Queue<byte[]> mQueue = new ConcurrentLinkedQueue<>();
     private boolean stop = false;
 
-    public static AudioDevice build(int sampleRateInHz, int channelConfig, int audioFormat) {
-        return new AudioDevice(sampleRateInHz, channelConfig, audioFormat);
+    public static AudioTrackWraper build(int sampleRateInHz, int channelConfig, int audioFormat) {
+        return new AudioTrackWraper(sampleRateInHz, channelConfig, audioFormat);
     }
 
-    public AudioDevice(int sampleRateInHz, int channelConfig, int audioFormat) {
+    public AudioTrackWraper(int sampleRateInHz, int channelConfig, int audioFormat) {
         this.sampleRateInHz = sampleRateInHz;
-        this.channelConfig = AudioFormat.CHANNEL_CONFIGURATION_STEREO;
+        this.channelConfig = channelConfig;
         this.audioFormat = audioFormat;
         init();
     }
@@ -37,12 +37,13 @@ public class AudioDevice implements Runnable {
         int bufferSize = AudioTrack.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat);
         //创建AudioTrack
         mPlayer = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz,
-                channelConfig,
+                AudioFormat.CHANNEL_CONFIGURATION_STEREO,
                 audioFormat,
                 bufferSize,
                 AudioTrack.MODE_STREAM);
-        mPlayThread = new Thread(this);
         this.stop = false;
+        mPlayThread = new Thread(this);
+        Log.e(TAG, String.format("init: sample=%d, channel=%d, audio=%d, bufferSize=%d", sampleRateInHz, channelConfig, audioFormat, bufferSize));
     }
 
     public void play(byte[] data) {
@@ -71,12 +72,15 @@ public class AudioDevice implements Runnable {
     }
 
     private void offer(byte[] data) {
-        Log.e(TAG, "offer: " + mQueue.size());
-        mQueue.offer(data);
+        synchronized (mQueue) {
+            mQueue.offer(data);
+        }
     }
 
     private byte[] poll() {
-        return mQueue.poll();
+        synchronized (mQueue) {
+            return mQueue.poll();
+        }
     }
 
     @Override
@@ -84,9 +88,10 @@ public class AudioDevice implements Runnable {
         byte[] data;
         while (!stop) {
             data = poll();
-            if (data != null) {
+            if (data != null && mPlayer != null) {
+                //long start = System.currentTimeMillis();
                 mPlayer.write(data, 0, data.length);
-                Log.e(TAG, "play audio: " + (data == null));
+                //Log.e(TAG, "write end: " + (System.currentTimeMillis() - start));
             }
         }
     }
