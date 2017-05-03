@@ -15,7 +15,7 @@ import android.view.Surface;
 import android.view.TextureView;
 
 import com.lmy.ffmpeg.codec.AVFrame;
-import com.lmy.ffmpeg.codec.AudioDevice;
+import com.lmy.ffmpeg.codec.AudioTrackWraper;
 import com.lmy.ffmpeg.codec.MediaDecoder;
 
 import java.nio.ByteBuffer;
@@ -30,7 +30,7 @@ public class VideoView extends ScalableTextureView implements TextureView.Surfac
     private final static String TAG = "VideoView";
     private Surface mSurface;
     private Canvas mCanvas;
-    private AudioDevice mAudioDevice;
+    private AudioTrackWraper mAudioDevice;
     private MediaDecoder mDecoder;
     private AsyncTask mTask;
     private AVFrame mFrame;
@@ -66,7 +66,7 @@ public class VideoView extends ScalableTextureView implements TextureView.Surfac
 
     public void setDataSource(String path) {
         mDecoder.setDataSource(path);
-        mAudioDevice = AudioDevice.build(mDecoder.getSample_rate(), mDecoder.getChannels(), AudioFormat.ENCODING_PCM_8BIT);
+        mAudioDevice = AudioTrackWraper.build(mDecoder.getSample_rate(), mDecoder.getChannels(), AudioFormat.ENCODING_PCM_16BIT);
         mAudioDevice.start();
 //        setContentWidth(mDecoder.getWidth());
 //        setContentHeight(mDecoder.getHeight());
@@ -79,8 +79,8 @@ public class VideoView extends ScalableTextureView implements TextureView.Surfac
         mTask = new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... voids) {
-                long startTime = System.currentTimeMillis();
                 int ret;
+                long startTime = System.currentTimeMillis();
                 while ((ret = mDecoder.nextFrame()) != 1) {
                     if (-1 == ret) continue;
                     long decodeTime = System.currentTimeMillis() - startTime;
@@ -99,7 +99,7 @@ public class VideoView extends ScalableTextureView implements TextureView.Surfac
                     else
                         mCanvas = mSurface.lockCanvas(mDrawRect);
                     onDraw();
-                    long sleep = 42 - System.currentTimeMillis() + startTime;
+                    long sleep = (1000 / mDecoder.getFrameRate()) - System.currentTimeMillis() + startTime;
                     if (sleep > 0)
                         try {
                             Thread.sleep(sleep);
@@ -107,7 +107,7 @@ public class VideoView extends ScalableTextureView implements TextureView.Surfac
                             e.printStackTrace();
                         }
                     long total = System.currentTimeMillis() - startTime;
-                    Log.v(TAG, String.format("decode draw, total, fps: %d, %d  %d  %d", decodeTime, System.currentTimeMillis() - drawTime, total, 1000 / total));
+                    Log.v(TAG, String.format("decode draw, total, fps: %d, %d, %d  %d  %d", sleep, decodeTime, System.currentTimeMillis() - drawTime, total, 1000 / total));
                     startTime = System.currentTimeMillis();
                 }
                 return null;
