@@ -57,7 +57,7 @@ LOCAL_LDLIBS    := -lm -llog
 # -g 后面的一系列附加项目添加了才能使用 arm_neon.h 头文件
 LOCAL_CFLAGS += -std=c99 -g -mfloat-abi=softfp -mfpu=neon -march=armv7-a -mtune=cortex-a8
 LOCAL_MODULE := ffmpeg
-LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c com_lmy_ffmpeg_player_Player.c com_lmy_ffmpeg_codec_MediaDecoder.c
+LOCAL_SRC_FILES =: com_lmy_ffmpeg_Version.c com_lmy_ffmpeg_player_Player.c com_lmy_ffmpeg_codec_MediaDecoder.c com_lmy_ffmpeg_codec_AudioDecoder.c
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 # 采用NEON优化技术
 LOCAL_ARM_NEON := true
