@@ -15,8 +15,12 @@ public class MediaDecoder {
         System.loadLibrary("ffmpeg");
     }
 
-    private AVFrame mFrame;
+    private AVFrame frame;
     private int width, height;
+    /**
+     * 帧率
+     */
+    private int frameRate;
     /**
      * （音频）采样率
      * Sample rate of the audio data.
@@ -35,11 +39,11 @@ public class MediaDecoder {
     private int channels;
 
     public MediaDecoder() {
-        this.mFrame = new AVFrame();
+        this.frame = new AVFrame();
     }
 
     public void setDataSource(String path) {
-        setDataSource(path, mFrame);
+        setDataSource(path, frame);
     }
 
     private native void setDataSource(String path, AVFrame frame);
@@ -49,7 +53,7 @@ public class MediaDecoder {
     public native void release();
 
     public AVFrame getFrame() {
-        return mFrame;
+        return frame;
     }
 
     public int getWidth() {
@@ -66,6 +70,14 @@ public class MediaDecoder {
 
     public void setHeight(int height) {
         this.height = height;
+    }
+
+    public int getFrameRate() {
+        return frameRate;
+    }
+
+    public void setFrameRate(int frameRate) {
+        this.frameRate = frameRate;
     }
 
     public int getSample_rate() {
