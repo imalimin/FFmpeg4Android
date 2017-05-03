@@ -10,6 +10,7 @@
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 #include "libswscale/swscale.h"
+#include "libswresample/swresample.h"
 #include "libavutil/log.h"
 //Log
 #ifdef ANDROID
@@ -32,24 +33,32 @@
     }
 }*/
 
-char input[500] = {0};
-AVFormatContext *pFormatCtx;
-int video_index = -1, audio_index = -1;
-AVCodecContext *pCodecCtx, *aCodecCtx;
+static char input[500] = {0};
+static AVFormatContext *pFormatCtx;
+static int video_index = -1, audio_index = -1, frame_rate = 0;
+static AVCodecContext *pCodecCtx, *aCodecCtx;
 //音频或视频解码器指针
-AVCodec *pCodec;
-AVFrame *pFrame, *pOutFrame;
-AVPacket *packet;
-struct SwsContext *img_convert_ctx;
-int ret, got_frame;
-struct SwsContext *img_convert_ctx;
-int frame_cnt;
+static AVCodec *pCodec;
+static AVFrame *pFrame, *pOutFrame, *pAudioFrame;
+static AVPacket *packet;
+static struct SwsContext *img_convert_ctx;
+static int ret, got_frame;
+static struct SwsContext *img_convert_ctx;
+static struct SwrContext *audio_convert_ctx;
+static int frame_cnt;
+//音频数据转换
+static enum AVSampleFormat dst_sample_fmt;
+static int dst_rate;
+static int max_dst_nb_samples;
+static int dst_nb_channels;
+static int dst_nb_samples;
+static int64_t dst_ch_layout;
 //缓存帧
-jobject avframe;
-jbyteArray buffer;
-jbyte* pBuffer;
+static jobject avframe;
+static jbyteArray buffer;
+static jbyte* pBuffer;
 
-void print_type(int num, int type){
+static void print_type(int num, int type){
     char pict_type[10] = {0};
     switch(type){
         case AV_PICTURE_TYPE_I:
@@ -67,21 +76,85 @@ void print_type(int num, int type){
     LOGI("第%5d帧，类型：%s",num, pict_type);
 }
 
-void init_info(JNIEnv *env, jobject thiz){
+static void init_info(JNIEnv *env, jobject thiz){
     jfieldID  fieldId;
     jclass cls = (*env)->GetObjectClass(env, thiz);//获得Java层该对象实例的类引用
+
     fieldId = (*env)->GetFieldID(env, cls , "width" , "I");//获得属性句柄
     (*env)->SetIntField(env, thiz , fieldId, pCodecCtx -> width);//获得属性值
     fieldId = (*env)->GetFieldID(env, cls , "height" , "I");
     (*env)->SetIntField(env, thiz , fieldId, pCodecCtx -> height);
+    fieldId = (*env)->GetFieldID(env, cls , "frameRate" , "I");
+    (*env)->SetIntField(env, thiz , fieldId, frame_rate);
     fieldId = (*env)->GetFieldID(env, cls , "sample_rate" , "I");
     (*env)->SetIntField(env, thiz , fieldId, aCodecCtx -> sample_rate);
     fieldId = (*env)->GetFieldID(env, cls , "channels" , "I");
     (*env)->SetIntField(env, thiz , fieldId, aCodecCtx -> channels);
-    LOGI("init %d %d", aCodecCtx -> sample_rate, aCodecCtx -> channels);
+    LOGI("init: 分辨率=%dx%d，帧率=%d，音频采样率=%d，声道数量=%d",
+    pCodecCtx -> width, pCodecCtx -> height, frame_rate, aCodecCtx -> sample_rate, aCodecCtx -> channels);
 }
 
-void swap_frame(JNIEnv *env, AVFrame* av, jobject frame){
+static void audio_swr_init(){
+    dst_sample_fmt = AV_SAMPLE_FMT_S16P;
+    enum AVSampleFormat src_sample_fmt = aCodecCtx -> sample_fmt;
+    if(src_sample_fmt == dst_sample_fmt){//aCodecCtx -> sample_fmt == AV_SAMPLE_FMT_S16 || aCodecCtx -> sample_fmt == AV_SAMPLE_FMT_S32 || aCodecCtx -> sample_fmt == AV_SAMPLE_FMT_U8
+        LOGE("codec->sample_fmt:%d",src_sample_fmt);
+        if(NULL != audio_convert_ctx){
+            swr_free(audio_convert_ctx);
+            audio_convert_ctx = NULL;
+        }
+        return;
+    }
+    if(NULL != audio_convert_ctx){
+        swr_free(audio_convert_ctx);
+    }
+    int ret = 0;
+    int64_t src_ch_layout = aCodecCtx -> channel_layout;
+    dst_ch_layout = aCodecCtx -> channel_layout;
+    int src_rate = aCodecCtx -> sample_rate;
+    dst_rate = aCodecCtx -> sample_rate;
+    int src_nb_samples = 1024;
+
+    /* create resampler context */
+    audio_convert_ctx = swr_alloc();
+    if (!audio_convert_ctx) {
+        LOGE("Could not allocate resampler context\n");
+        return;
+    }
+    /* set options */
+    av_opt_set_int(audio_convert_ctx, "in_channel_layout",    src_ch_layout, 0);
+    av_opt_set_int(audio_convert_ctx, "in_sample_rate",       src_rate, 0);
+    av_opt_set_sample_fmt(audio_convert_ctx, "in_sample_fmt", src_sample_fmt, 0);
+
+    av_opt_set_int(audio_convert_ctx, "out_channel_layout",    dst_ch_layout, 0);
+    av_opt_set_int(audio_convert_ctx, "out_sample_rate",       dst_rate, 0);
+    av_opt_set_sample_fmt(audio_convert_ctx, "out_sample_fmt", dst_sample_fmt, 0);
+    /* initialize the resampling context */
+    if ((ret = swr_init(audio_convert_ctx)) < 0) {
+        LOGE("Failed to initialize the resampling context\n");
+        return;
+    }
+
+    pAudioFrame = av_frame_alloc();
+
+    /* compute the number of converted samples: buffering is avoided
+     * ensuring that the output buffer will contain at least all the
+     * converted input samples */
+    max_dst_nb_samples = dst_nb_samples =
+        av_rescale_rnd(src_nb_samples, dst_rate, src_rate, AV_ROUND_UP);
+
+    /* buffer is going to be directly written to a rawaudio file, no alignment */
+    dst_nb_channels = av_get_channel_layout_nb_channels(dst_ch_layout);
+    LOGE("dst_nb_channels=%d", dst_nb_channels);
+    ret = av_samples_alloc_array_and_samples(pAudioFrame -> data, pAudioFrame -> linesize, dst_nb_channels,
+                                             dst_nb_samples, dst_sample_fmt, 0);
+    if (ret < 0) {
+        LOGE("Could not allocate destination samples\n");
+        return;
+    }
+}
+
+static void swap_frame(JNIEnv *env, AVFrame* av, jobject frame){
     if(frame == NULL){
         LOGE("AVFrame is NULL!");
         return;
@@ -153,23 +226,44 @@ void init_frame(JNIEnv *env, AVFrame* av, jobject frame){
     (*env)->SetIntField(env, frame , fieldId, av -> channels);
 }
 
-void swap_audio_frame(JNIEnv *env, AVFrame* av, jobject frame){
+static void swap_audio_frame(JNIEnv *env, AVFrame* av, jobject frame){
     if(frame == NULL){
         LOGE("AVFrame is NULL!");
         return;
     }
-    init_frame(env ,av, frame);
+    init_frame(env, av, frame);
+
+    int data_size = av_get_bytes_per_sample(dst_sample_fmt);
+    if (data_size < 0) {
+        /* This should not occur, checking just for paranoia */
+        LOGE("Failed to calculate data size\n");
+        return (jint)-1;
+    }
+
     jfieldID  fieldId;
     jclass cls = (*env)->GetObjectClass(env, frame);//获得Java层该对象实例的类引用
-
     fieldId = (*env)->GetFieldID(env, cls , "data" , "[B");
-    int size = av_samples_get_buffer_size(av -> linesize, aCodecCtx -> channels,av -> nb_samples,
-    aCodecCtx -> sample_fmt, 1);
+
+    int nb_samples = av -> nb_samples, channels = aCodecCtx -> channels;
+    int size = av -> linesize[0] * channels;
+    //LOGE("audio buffer %d %d %d %d", nb_samples, channels, size, data_size);
     buffer = (*env)->NewByteArray(env, size);
     pBuffer = (*env)->GetByteArrayElements(env, buffer, 0);
+
+    int i = 0, ch = 0, count = 0;
+    for (i=0; i < nb_samples; i++)
+        for (ch=0; ch< channels; ch++){
+            memcpy(pBuffer + count, av -> data[ch] + data_size * i, data_size);
+            count += data_size;
+        }
+
+    //LOGI("samples: %d %d %d %d %d", pBuffer[0], pBuffer[1], pBuffer[2], pBuffer[3], pBuffer[4]);
+    //LOGI("samples: %d %d %d %d %d", av -> data[0][0], av -> data[0][1], av -> data[1][0], av -> data[1][1], av -> data[0][2]);
+
     (*env)->SetByteArrayRegion(env, buffer, 0, size, pBuffer);
     (*env)->SetObjectField(env, frame , fieldId, buffer);
 }
+
 /*
  * Class:     com_lmy_ffmpeg_codec_MediaDecoder
  * Method:    setDataSource
@@ -200,6 +294,7 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
         int type = pFormatCtx -> streams[i] -> codec -> codec_type;
         if(type == AVMEDIA_TYPE_VIDEO){
             video_index = i;
+            frame_rate = pFormatCtx -> streams[video_index] -> r_frame_rate.num;
         }else if(type == AVMEDIA_TYPE_AUDIO){
             audio_index = i;
         }
@@ -223,6 +318,7 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
         LOGE("无法打开视频解码器\n");
         return;
     }
+
     aCodecCtx = pFormatCtx ->streams[audio_index] -> codec;
     pCodec = avcodec_find_decoder(aCodecCtx -> codec_id);
     if(pCodec == NULL){
@@ -262,7 +358,9 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_setDataSource
     img_convert_ctx = sws_getContext(pCodecCtx -> width, pCodecCtx -> height, pCodecCtx -> pix_fmt,
     pCodecCtx -> width, pCodecCtx -> height, pOutFrame -> format, SWS_BICUBIC, NULL, NULL, NULL);
 
+    //audio_sws_init();
     init_info(env, thiz);
+    audio_swr_init();
   }
 
 /*
@@ -299,8 +397,23 @@ JNIEXPORT jint JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_nextFrame
             }
             if(!got_frame)
                 continue;
-            LOGI("音频: %d %d %d", pFrame -> sample_rate, pFrame -> nb_samples, pFrame -> linesize[0]);
-            swap_audio_frame(env, pFrame, avframe);
+            LOGI("音频: %d %d %d %d", pFrame -> sample_rate, pFrame -> nb_samples, pFrame -> linesize[0], aCodecCtx -> sample_fmt);
+
+            ret = av_samples_alloc(pAudioFrame -> data, pAudioFrame -> linesize, dst_nb_channels, dst_nb_samples, dst_sample_fmt, 0);
+            //LOGE("av_samples_alloc: %d %d %d %d %d", pAudioFrame -> nb_samples, aCodecCtx -> sample_fmt, dst_nb_samples, dst_sample_fmt, AV_SAMPLE_FMT_S16);
+            if (ret < 0){
+                LOGE("AudioFrame分配失败");
+            }
+            ret = swr_convert(audio_convert_ctx, pAudioFrame -> data, dst_nb_samples, pFrame -> data, pFrame -> nb_samples);
+            if (ret < 0){
+                LOGE("sample转换失败");
+            }
+            pAudioFrame -> channels = aCodecCtx -> channels;
+            pAudioFrame -> sample_rate = dst_rate;
+            pAudioFrame -> nb_samples = dst_nb_samples;
+            //LOGI("swr_convert %d %d %d %d", dst_rate, dst_nb_samples, pAudioFrame -> linesize[0], dst_sample_fmt);
+            //LOGI("src samples: %d %d %d %d %d", pFrame -> data[0][0], pFrame -> data[0][1], pFrame -> data[1][0], pFrame -> data[1][1], pFrame -> data[0][2]);
+            swap_audio_frame(env, pAudioFrame, avframe);
             return (jint)0;
         }
         av_free_packet(packet);
@@ -335,5 +448,6 @@ JNIEXPORT void JNICALL Java_com_lmy_ffmpeg_codec_MediaDecoder_release
     sws_freeContext(img_convert_ctx);
     av_frame_free(&pFrame);
     avcodec_close(pCodecCtx);
+    avcodec_close(aCodecCtx);
     avformat_close_input(&pFormatCtx);
   }
