@@ -14,6 +14,7 @@ public class AVFrame {
      * - decoding: set by AVCodecContext.get_buffer()
      */
     private byte[] data;
+    private float[] samples;
     /**
      * Size, in bytes, of the data for each picture/channel plane.
      * <p>
@@ -119,6 +120,14 @@ public class AVFrame {
 
     public void setData(byte[] data) {
         this.data = data;
+    }
+
+    public float[] getSamples() {
+        return samples;
+    }
+
+    public void setSamples(float[] samples) {
+        this.samples = samples;
     }
 
     public int getWidth() {
